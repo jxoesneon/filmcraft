@@ -1,0 +1,14 @@
+[package]
+name = "filmcraft-ui-martensite"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Sovereign retained-mode NLE video editing user interface for FilmCraft powered by Martensite"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+proptest = "1.4"
