@@ -22,8 +22,9 @@ let availability = filmcraft_platform::register(); // Available("VideoToolbox") 
   reorder buffer of the stream's own depth (`max_num_reorder_frames` /
   `sps_max_num_reorder_pics`) restores presentation order; a run starting at an HEVC CRA leaves
   out its RASL pictures, as our decoder does. Each seek (`reset`) starts a fresh session.
-- **Windows: Media Foundation + Direct3D 11 / DXVA, H.264 (`avcC`) and HEVC (`hvcC`)**, 8-bit 4:2:0
-  (H.264 Baseline / Main / High, HEVC Main) and 10-bit 4:2:0 (HEVC Main 10)
+- **Windows: Media Foundation + Direct3D 11 / DXVA, H.264 (`avcC`), HEVC (`hvcC`), VP9 (`vpcC`) and
+  AV1 (`av1C`)**, 8-bit 4:2:0 (H.264 Baseline / Main / High, HEVC Main, VP9 profile 0, AV1 main) and
+  10-bit 4:2:0 (HEVC Main 10, VP9 profile 2, AV1 main 10)
   (`media_foundation/`). A Direct3D-aware decoder MFT (Microsoft's H.264 decoder, the HEVC Video
   Extensions' decoder, or a vendor's synchronous hardware MFT) is driven at the level of single
   access units, so there is no Source Reader and no second demuxer: the container samples FilmCraft
@@ -43,14 +44,32 @@ let availability = filmcraft_platform::register(); // Available("VideoToolbox") 
     Windows' own software decoding is never used in place of ours.
   - *Declined up front* (our decoder is used): field-coded H.264, H.264 profiles other than
     Baseline / Main / High, 10-bit H.264, 4:2:2 / 4:4:4 / monochrome, HEVC profiles other than
-    Main / Main Still Picture / Main 10, larger than 8192×8192, no Direct3D 11 video device, no
-    DXVA decoder for the stream on this GPU, no decoder MFT (HEVC needs the *HEVC Video Extensions*
-    from the Microsoft Store, which the Windows "N" editions and some installs lack).
+    Main / Main Still Picture / Main 10, VP9 profiles 1 / 3 (4:2:2 / 4:4:4 / RGB) and 12-bit, AV1
+    profiles 1 / 2 and 12-bit, larger than 8192×8192, no Direct3D 11 video device, no DXVA decoder
+    for the stream on this GPU, no decoder MFT (HEVC, VP9 and AV1 need the *HEVC Video Extensions*,
+    *VP9 Video Extensions* and *AV1 Video Extension* from the Microsoft Store, which the Windows "N"
+    editions and some installs lack). Several GPUs' DXVA lacks AV1 profiles 1 / 2 as well.
+  - *VP9 and AV1* (`codecs::hw::FrameStreamInfo`, `media_foundation/stream.rs`): the container
+    sample goes in as it is (a VP9 frame or superframe, an AV1 temporal unit; the `av1C` sequence
+    header goes first after a seek). The MFT outputs only shown pictures, in presentation order, so
+    hidden alt-ref frames and `show_existing_frame` need nothing special. Picture size and colour
+    are read from the bitstream the way the software decoders do (`hw_frame::vp9_color` /
+    `av1_color` are shared with them). A VP9 key frame of another size or format, or an AV1 sequence
+    header unlike `av1C`'s, hands the stream to the software decoder (`HybridDecoder`).
   - `mfplat.dll` is loaded at run time (`mft.rs`), not linked: Windows "N" editions without the Media
     Feature Pack still start FilmCraft, which then decodes in software.
   - After a `flush` (which drains the MFT) the MFT only restarts at an IDR picture; the GOP cache
     always seeks after a flush, and a caller that continues from the middle of a GOP gets an error
     that `HybridDecoder` answers by replaying the run in software.
+- **Windows: NVIDIA NVENC H.264 encoding** (`nvenc/`), 8-bit SDR 4:2:0 for Export. The driver's
+  `nvEncodeAPI64.dll` (API 12.1, no CUDA or SDK) is loaded at run time, so machines without NVIDIA
+  still start. RGBA is converted with the software encoder's own BT.709 limited conversion into NV12
+  input buffers (a ring of eight); the encoder runs preset P5 with high-quality tuning, CABAC (CAVLC
+  for Baseline), one B-frame when the profile and GPU allow it, and an IDR at every keyframe
+  distance; the parameter sets go into `avcC`. Export ▸ Hardware encoding (off by default) selects it.
+  It declines two-pass VBR, HDR, MXF, interlaced output, sizes outside NVENC's limits and systems
+  without an NVIDIA GPU or driver, and the software encoder runs instead. A failure during an export
+  ends it with an error, since a hardware stream cannot be finished in software.
 - **Other systems:** `register()` does nothing and returns `Availability::Unavailable`.
 - **`HybridDecoder`** (`hybrid.rs`, safe code): the hardware decoder plus the means to build our
   software decoder for the same `SampleEntry` (`filmcraft_codecs::software_video_decoder`). On a
@@ -130,7 +149,7 @@ level and flags are the encoder's own. If it is missing the export stops with th
   `catch_unwind`; every `unsafe` block has a `// SAFETY:` comment; the public API is safe.
 - **Counted:** `perf.stats` `decode.hardware` (frames, software frames, sessions, declined,
   fallbacks; `filmcraft_codecs::hw::hw_stats`) and `backend` (the registered backend's name,
-  `filmcraft_codecs::hw::hw_backend`).
+  `filmcraft_codecs::hw::hw_backend`). `export.hardware` counts the NVENC encoder's frames, sessions and declines.
 
 ## Tests
 
@@ -140,6 +159,9 @@ level and flags are the encoder's own. If it is missing the export stops with th
 | `tests/fallback.rs` (every OS) | `HybridDecoder` with a stand-in hardware decoder failing after N samples (every sync sample ± a few, first / last sample, after a seek): output identical to the software decoder; in-band parameter sets identical to the sample entry's stay in hardware, different ones switch to software |
 | `tests/setting.rs` | Hardware decoding Off gives the software decoder through `make_video_decoder` and the media stack (no hardware frames); Auto gives VideoToolbox where available |
 | `tests/hardware_encode.rs` (macOS) | what the hardware path takes and declines; round trip through our software decoder (every picture, in order, luma PSNR above 30 dB, keyframes no further apart than asked, no composition offsets); an export through `filmcraft_export` that decodes in our decoder and in ffmpeg / ffprobe (profile, size, frame count, BT.709); the built-in encoder still exporting everything hardware declines; exact output size at sizes that are not multiples of 16; hostile configurations (zero, huge, odd sizes, frame rates, bitrates, keyframe intervals, wrong planes) give errors and never panic; encoders dropped at any point do not crash or hang. The same for **HEVC**: Main profile, 8-bit 4:2:0, `hvc1` entry with VPS / SPS / PPS and 4-byte lengths, MP4 and QuickTime, AAC audio, two-pass refused, the format list agreeing with the probe, ffprobe reading `codec_name=hevc`, `profile=Main`, `codec_tag_string=hvc1`, `pix_fmt=yuv420p`, BT.709 |
+| `tests/nvenc.rs` (Windows, NVIDIA) | H.264 from NVENC (1280×720, 6 Mbps, 72 frames) decodes with our decoder at worst 46.9 dB luma PSNR; IDR at 0, 24 and 48; dts / pts right |
+| `tests/nvenc_export.rs` (Windows, NVIDIA) | Export with hardware encoding against the software encoder through the export pipeline: the two decoded files at worst 54.8 dB luma PSNR; ffmpeg decodes the file without errors; declined cases go to the software encoder; the counters |
+| `src/nvenc/abi_tests.rs` (Windows) | FFI structs' sizes, alignments, field offsets, constants and GUIDs against a C compiler's view of NVIDIA's `nvEncodeAPI.h` (12.1) |
 
 Fixtures are made with ffmpeg into `target/fixtures/platform/` (generator only, never linked);
 tests skip without ffmpeg or without a hardware decoder.
@@ -165,5 +187,7 @@ playback with no dropped frames at Full, 1/2 and 1/4. Details in
 
 ## Not yet
 
-Zero-copy upload of `CVPixelBuffer`s into wgpu textures; B-frames; 10-bit and HDR HEVC (Main 10);
-Media Foundation / D3D11 (Windows) and VA-API (Linux) decoders; field-coded H.264.
+Zero-copy upload of decoded pictures into wgpu textures (`CVPixelBuffer`s on macOS, Direct3D 11
+textures on Windows); B-frames and 10-bit / HDR HEVC (Main 10) in hardware encoding; VA-API (Linux)
+decoders; field-coded H.264; HEVC, 10-bit and HDR encoding with NVENC, and encoders from other
+vendors on Windows (through Media Foundation); VP9 / AV1 4:4:4 and 12-bit on Windows.
