@@ -29,8 +29,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target.triple }}
-      - uses: taiki-e/install-action@cargo-deb
-      - uses: taiki-e/install-action@cargo-generate-rpm
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
       - name: Build and Package
         run: |
           if [ "${{ matrix.target.format }}" = "deb" ]; then
@@ -49,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v1
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           bundle: true
           manifest-path: packaging/flatpak/org.artcraft.app.yml
@@ -68,7 +69,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin, x86_64-apple-darwin
-      - uses: taiki-e/install-action@cargo-bundle
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-bundle
       - name: Compile and Lipoo Universal Binary
         run: |
           cargo build --release --target aarch64-apple-darwin
@@ -96,7 +99,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target.triple }}
-      - uses: taiki-e/install-action@cargo-wix
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-wix
       - name: Compile and Build Windows MSI
         run: |
           cargo build --release --target ${{ matrix.target.triple }}
