@@ -30,13 +30,21 @@ impl NleKeyboardEngine {
     pub fn handle_jkl(&mut self, key: &str) -> i32 {
         match key {
             "j" | "J" => {
-                if self.jkl_speed > 0 { self.jkl_speed = -1; }
-                else { self.jkl_speed = (self.jkl_speed * 2).clamp(-8, -1); }
+                if self.jkl_speed > 0 {
+                    self.jkl_speed = -1;
+                } else {
+                    self.jkl_speed = (self.jkl_speed * 2).clamp(-8, -1);
+                }
             }
-            "k" | "K" => { self.jkl_speed = 0; }
+            "k" | "K" => {
+                self.jkl_speed = 0;
+            }
             "l" | "L" => {
-                if self.jkl_speed < 0 { self.jkl_speed = 1; }
-                else { self.jkl_speed = (self.jkl_speed * 2).max(1).clamp(1, 8); }
+                if self.jkl_speed < 0 {
+                    self.jkl_speed = 1;
+                } else {
+                    self.jkl_speed = (self.jkl_speed * 2).max(1).clamp(1, 8);
+                }
             }
             _ => {}
         }

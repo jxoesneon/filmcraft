@@ -28,12 +28,7 @@ pub mod timeline {
                     let track = clip.track_index;
                     let new_id = clip.id + 10000;
                     self.clips[pos].duration_frames = first_dur;
-                    self.clips.push(Clip {
-                        id: new_id,
-                        start_frame: cut_frame,
-                        duration_frames: second_dur,
-                        track_index: track,
-                    });
+                    self.clips.push(Clip { id: new_id, start_frame: cut_frame, duration_frames: second_dur, track_index: track });
                     return true;
                 }
             }

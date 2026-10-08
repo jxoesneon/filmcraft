@@ -91,6 +91,37 @@ pub enum EngineError {
 
 pub type Result<T> = std::result::Result<T, EngineError>;
 
+/// The application engine: project, commands, history and edit state.
+/// Named `Engine` so UIs (egui, Martensite, headless) refer to one type.
+pub type Engine = Session;
+
+/// Timeline tool identity, in professional NLE toolbar order. UI-agnostic so
+/// every front-end shares the canonical list; each UI maps it to its own
+/// presentation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Tool {
+    /// Selection tool (V).
+    Selection,
+    /// Track Select Forward (A).
+    TrackSelectForward,
+    /// Ripple Edit (B).
+    RippleEdit,
+    /// Rolling Edit (N).
+    RollingEdit,
+    /// Rate Stretch (R).
+    RateStretch,
+    /// Razor (C).
+    Razor,
+    /// Slip (Y).
+    Slip,
+    /// Slide (U).
+    Slide,
+    /// Hand (H).
+    Hand,
+    /// Zoom (Z).
+    Zoom,
+}
+
 /// Host services (file access, clipboard…) injected by the frontend.
 pub trait Services: Send + Sync {
     fn read_file(&self, path: &str) -> std::io::Result<Vec<u8>>;

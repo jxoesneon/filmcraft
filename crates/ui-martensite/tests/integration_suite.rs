@@ -1,22 +1,18 @@
 //! End-to-end NLE integration tests.
 
+use filmcraft_engine::Engine;
 use filmcraft_ui_martensite::{
     FilmcraftApp, NleTool,
-    widgets::timeline::{Clip, TimelineWidget},
     widgets::meters::AudioMeterWidget,
+    widgets::timeline::{Clip, TimelineWidget},
 };
 
 #[test]
 fn test_nle_editing_workflow() {
-    let mut app = FilmcraftApp::new();
+    let mut app = FilmcraftApp::new(Engine::default());
     let mut timeline = TimelineWidget::new();
 
-    timeline.clips.push(Clip {
-        id: 1,
-        start_frame: 0,
-        duration_frames: 300,
-        track_index: 0,
-    });
+    timeline.clips.push(Clip { id: 1, start_frame: 0, duration_frames: 300, track_index: 0 });
 
     // 1. Razor Tool Workflow
     let razor = app.keyboard.on_key_down("c");

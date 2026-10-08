@@ -6,45 +6,48 @@ pub mod shortcuts;
 pub mod theme;
 pub mod widgets;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum NleTool {
-    Selection,      // V
-    TrackSelectForward, // A
-    RippleEdit,     // B
-    RollingEdit,    // N
-    RateStretch,    // R
-    Razor,          // C
-    Slip,           // Y
-    Slide,          // U
-    Hand,           // H
-    Zoom,           // Z
-}
+use filmcraft_engine::Engine;
+use std::sync::{Arc, Mutex};
 
+/// Timeline tool identity shared by every front-end. `NleTool` stays as the
+/// UI-facing alias for `filmcraft_engine::Tool`.
+pub use filmcraft_engine::Tool;
+pub use filmcraft_engine::Tool as NleTool;
+
+/// Application state container managing the Martensite GUI pipeline.
 pub struct FilmcraftApp {
+    pub engine: Arc<Mutex<Engine>>,
     pub theme: theme::FilmTheme,
     pub keyboard: shortcuts::NleKeyboardEngine,
-    pub active_tool: NleTool,
+    pub active_tool: Tool,
     pub playhead_frame: u64,
     pub duration_frames: u64,
     pub is_playing: bool,
     pub in_point: Option<u64>,
     pub out_point: Option<u64>,
     pub snapping_enabled: bool,
+    pub is_dirty: bool,
 }
 
 impl FilmcraftApp {
-    pub fn new() -> Self {
+    pub fn new(engine: Engine) -> Self {
         Self {
+            engine: Arc::new(Mutex::new(engine)),
             theme: theme::FilmTheme::dark_nle(),
             keyboard: shortcuts::NleKeyboardEngine::new(),
-            active_tool: NleTool::Selection,
+            active_tool: Tool::Selection,
             playhead_frame: 0,
             duration_frames: 1800, // 60s at 30fps
             is_playing: false,
             in_point: None,
             out_point: None,
             snapping_enabled: true,
+            is_dirty: false,
         }
+    }
+
+    pub fn set_tool(&mut self, tool: Tool) {
+        self.active_tool = tool;
     }
 
     pub fn toggle_play(&mut self) -> bool {
@@ -81,9 +84,11 @@ mod tests {
 
     #[test]
     fn test_app_lifecycle() {
-        let mut app = FilmcraftApp::new();
+        let mut app = FilmcraftApp::new(Engine::default());
+        assert_eq!(app.active_tool, Tool::Selection);
         assert_eq!(app.playhead_frame, 0);
         assert!(!app.is_playing);
+        assert!(!app.is_dirty);
 
         assert!(app.toggle_play());
         assert!(app.is_playing);
@@ -101,5 +106,10 @@ mod tests {
         app.clear_in_out();
         assert_eq!(app.in_point, None);
         assert_eq!(app.out_point, None);
+
+        app.set_tool(Tool::Razor);
+        assert_eq!(app.active_tool, Tool::Razor);
+        assert!(!app.toggle_snapping());
+        assert!(app.toggle_snapping());
     }
 }

@@ -71,6 +71,7 @@ const LAYERS: &[(&str, u8)] = &[
     ("engine", 4),
     ("platform", 5),
     ("ui-egui", 5),
+    ("ui-martensite", 5),
     ("automation", 5),
     ("filmcraft", 6),
     ("cli", 6),
