@@ -12,17 +12,16 @@ finish-args:
   - --device=dri
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
+  build-args:
+    - --share=network
   env:
     CARGO_HOME: /run/build/filmcraft/cargo
 modules:
   - name: filmcraft
     buildsystem: simple
-    build-options:
-      build-args:
-        - --share=network
     build-commands:
-      - cargo build --release --workspace
+      - cargo build --release -p filmcraft
       - install -Dm755 target/release/filmcraft /app/bin/filmcraft
     sources:
       - type: dir
-        path: .
+        path: ../../

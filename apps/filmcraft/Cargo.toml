@@ -38,3 +38,8 @@ winit = { version = "0.30", default-features = false }
 # Icon + VERSIONINFO for filmcraft.exe (build.rs); only needed when building on Windows.
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1"
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/filmcraft", dest = "/usr/bin/filmcraft", mode = "755" }
+]
